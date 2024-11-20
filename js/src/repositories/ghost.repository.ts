@@ -1,50 +1,32 @@
+import GhostDAO from '../dao/ghost.dao';
 import { GhostModel } from '../models/ghost.dto';
-import Database from '../helpers/database';
-import { RowDataPacket } from 'mysql2';
 
-class GhostRepository {
-    private static instance: GhostRepository;
-    private ghosts: Map<number, GhostModel> = new Map();
+class GhostService {
+    private static instance: GhostService;
 
     private constructor() { }
 
-    public static getInstance(): GhostRepository {
-        if (!GhostRepository.instance) {
-            GhostRepository.instance = new GhostRepository();
+    public static getInstance(): GhostService {
+        if (!GhostService.instance) {
+            GhostService.instance = new GhostService();
         }
-        return GhostRepository.instance;
+        return GhostService.instance;
     }
 
-    // Fonction pour récupérer tous les ghosts depuis la base de données
+    // Méthode pour lister les lieux hantés
     public async findAll(): Promise<GhostModel[]> {
-        const connection = await Database.getInstance();
-        const [rows] = await connection.execute<RowDataPacket[]>('SELECT * FROM ghost');
-        return rows.map(row => ({
-            id: row.id,
-            lieudit: row.lieudit,
-            adresse: row.adresse,
-            like: row.like,
-            // Add other properties as needed
-        } as GhostModel));
+        return await GhostDAO.findAll();
     }
 
-    // Fonction pour rechercher un ghost par son identifiant
+    // Méthode pour lister les lieux hantés
     public async find(id: number): Promise<GhostModel | undefined> {
-        const connection = await Database.getInstance();
-        const [rows] = await connection.execute<RowDataPacket[]>('SELECT * FROM ghost WHERE id = ?', [id]);
-        return rows.length > 0 ? (rows[0] as GhostModel) : undefined;
+        return await GhostDAO.find(id);
     }
 
-    // Fonction pour mettre à jour un ghost et retourner le modèle mis à jour
+    // Méthode pour inverser la valeur de `like` pour un ghost spécifique
     public async update(ghost: GhostModel): Promise<GhostModel | undefined> {
-        const connection = await Database.getInstance();
-        await connection.execute(
-            'UPDATE ghost SET lieudit = ?, adresse = ?, `like` = ?, fear = ?, created_at = ?, updated_at = ? WHERE id = ?',
-            [ghost.lieudit, ghost.adresse, ghost.like, ghost.fear, ghost.created_at, ghost.updated_at, ghost.id]
-        );
-        const [updatedRows] = await connection.execute<RowDataPacket[]>('SELECT * FROM ghost WHERE id = ?', [ghost.id]);
-        return updatedRows.length > 0 ? (updatedRows[0] as GhostModel) : undefined;
+        return await GhostDAO.update(ghost);
     }
 }
 
-export default GhostRepository.getInstance();
+export default GhostService.getInstance();

@@ -1,9 +1,10 @@
-import { Request, Response } from "express";
 import { GhostModel } from '../models/ghost.dto';
-import GhostService from '../services/ghost.service';
+import Database from '../database/database';
+import { RowDataPacket } from 'mysql2';
 
 class GhostDAO {
     private static instance: GhostDAO;
+    private ghosts: Map<number, GhostModel> = new Map();
 
     private constructor() { }
 
@@ -14,41 +15,35 @@ class GhostDAO {
         return GhostDAO.instance;
     }
 
-    // Fonction pour gérer la requête HTTP et inverser la valeur de `like`
-    public async toggleGhostLike(req: Request, res: Response): Promise<void> {
-        const { id } = req.params;
-        try {
-            const ghost = GhostService.like(Number(id));
-            if (ghost) {
-                res.status(200).json({ message: 'Like toggled successfully', data: ghost });
-            } else {
-                res.status(404).json({ error: 'Ghost not found' });
-            }
-        } catch (error) {
-            console.error('Error toggling like:', error);
-            res.status(500).json({ error: 'Internal Server Error' });
-        }
+    // Fonction pour récupérer tous les ghosts depuis la base de données
+    public async findAll(): Promise<GhostModel[]> {
+        const connection = await Database.getInstance();
+        const [rows] = await connection.execute<RowDataPacket[]>('SELECT * FROM ghost');
+        return rows.map(row => ({
+            id: row.id,
+            lieudit: row.lieudit,
+            adresse: row.adresse,
+            like: row.like,
+            // Add other properties as needed
+        } as GhostModel));
     }
 
-    // Fonction pour gérer la requête HTTP et renvoyer les ghosts
-    public async findAll(req: Request, res: Response): Promise<void> {
-        try {
-            const ghosts = GhostService.list();
-            res.json(ghosts);
-        } catch (error) {
-            console.error('Error fetching ghosts:', error);
-            res.status(500).json({ error: 'Internal Server Error' });
-        }
+    // Fonction pour rechercher un ghost par son identifiant
+    public async find(id: number): Promise<GhostModel | undefined> {
+        const connection = await Database.getInstance();
+        const [rows] = await connection.execute<RowDataPacket[]>('SELECT * FROM ghost WHERE id = ?', [id]);
+        return rows.length > 0 ? (rows[0] as GhostModel) : undefined;
     }
 
-    public async find(req: Request, res: Response): Promise<void> {
-        try {
-            const ghost = GhostService.find(Number(req.params.id));
-            res.json(ghost);
-        } catch (error) {
-            console.error('Error fetching ghosts:', error);
-            res.status(500).json({ error: 'Internal Server Error' });
-        }
+    // Fonction pour mettre à jour un ghost et retourner le modèle mis à jour
+    public async update(ghost: GhostModel): Promise<GhostModel | undefined> {
+        const connection = await Database.getInstance();
+        await connection.execute(
+            'UPDATE ghost SET lieudit = ?, adresse = ?, `like` = ?, fear = ?, created_at = ?, updated_at = ? WHERE id = ?',
+            [ghost.lieudit, ghost.adresse, ghost.like, ghost.fear, ghost.created_at, ghost.updated_at, ghost.id]
+        );
+        const [updatedRows] = await connection.execute<RowDataPacket[]>('SELECT * FROM ghost WHERE id = ?', [ghost.id]);
+        return updatedRows.length > 0 ? (updatedRows[0] as GhostModel) : undefined;
     }
 }
 
